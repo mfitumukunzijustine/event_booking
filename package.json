@@ -1,0 +1,26 @@
+{
+  "name": "event_booking",
+  "version": "1.0.0",
+  "description": "Event Booking API: browse events, view seats, and make reservations with transactional safety",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "mysql2": "^3.6.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2",
+    "jest": "^29.7.0",
+    "eslint": "^8.55.0"
+  },
+  "keywords": ["nodejs", "express", "mysql", "events", "bookings"],
+  "author": "Event Booking",
+  "license": "MIT"
+}

@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Event Booking</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+    <div class="container mt-5">
+        <div class="row">
+            <div class="col-md-8 mx-auto">
+                <h1 class="text-center mb-4">Event Booking</h1>
+
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <form id="createUserForm" class="mb-3">
+                            <div class="row g-2">
+                                <div class="col">
+                                    <input id="userName" class="form-control" placeholder="Your name" required />
+                                </div>
+                                <div class="col">
+                                    <input id="userEmail" class="form-control" placeholder="Email" required />
+                                </div>
+                                <div class="col-auto">
+                                    <button class="btn btn-primary" type="submit">Create User</button>
+                                </div>
+                            </div>
+                        </form>
+
+                        <form id="createEventForm" class="row g-2">
+                            <div class="col-6">
+                                <input id="eventName" class="form-control" placeholder="Event name" required />
+                            </div>
+                            <div class="col-4">
+                                <input id="eventSeats" class="form-control" type="number" min="1" placeholder="Total seats" required />
+                            </div>
+                            <div class="col-2">
+                                <button class="btn btn-success w-100" type="submit">Add Event</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="card mb-3">
+                    <div class="card-header">Events</div>
+                    <div class="card-body">
+                        <div id="eventsList">Loading events...</div>
+                    </div>
+                </div>
+
+                <div class="card mb-3">
+                    <div class="card-header">Make Booking</div>
+                    <div class="card-body">
+                        <form id="bookingForm" class="row g-2">
+                            <div class="col-4">
+                                <select id="bookingUser" class="form-select" required>
+                                    <option value="">Select user</option>
+                                </select>
+                            </div>
+                            <div class="col-4">
+                                <select id="bookingEvent" class="form-select" required>
+                                    <option value="">Select event</option>
+                                </select>
+                            </div>
+                            <div class="col-2">
+                                <input id="bookingSeats" type="number" min="1" class="form-control" placeholder="Seats" required />
+                            </div>
+                            <div class="col-2">
+                                <button class="btn btn-primary w-100" type="submit">Book</button>
+                            </div>
+                        </form>
+                        <div id="bookingResult" class="mt-2"></div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">Event Bookings</div>
+                    <div class="card-body">
+                        <div id="bookingsList">Select an event to view bookings.</div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Helpers
+        function el(id) { return document.getElementById(id); }
+        function showAlert(message, type='info'){
+            const node = document.createElement('div');
+            node.className = `alert alert-${type} alert-dismissible`;
+            node.innerHTML = message + '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
+            document.querySelector('.container').prepend(node);
+            setTimeout(()=>node.remove(), 5000);
+        }
+
+        async function fetchJSON(url, opts){
+            const res = await fetch(url, opts);
+            if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+            return res.json();
+        }
+
+        async function loadEvents(){
+            try{
+                const events = await fetchJSON('/api/events');
+                const list = events.map(e => `
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div>
+                            <strong>${e.name}</strong> — ${e.description || ''}
+                            <div class="text-muted small">Seats available: ${e.seats_available} / ${e.total_seats}</div>
+                        </div>
+                        <div>
+                            <button class="btn btn-sm btn-outline-primary me-1" onclick="viewBookings(${e.id})">View Bookings</button>
+                            <button class="btn btn-sm btn-outline-danger" onclick="deleteEvent(${e.id})">Delete</button>
+                        </div>
+                    </div>
+                `).join('');
+                el('eventsList').innerHTML = list || '<div class="text-muted">No events</div>';
+
+                // update event select
+                const sel = el('bookingEvent');
+                sel.innerHTML = '<option value="">Select event</option>' + events.map(e=>`<option value="${e.id}">${e.name} (${e.seats_available} available)</option>`).join('');
+            }catch(err){
+                el('eventsList').innerHTML = '<div class="text-danger">Failed to load events</div>';
+                console.error(err);
+            }
+            loadUsers();
+        }
+
+        async function loadUsers(){
+            try{
+                // no list endpoint for all users; we can fetch created users by trying ids 1..50 or add endpoint — but we'll add a quick /api/users list by calling /api/bookings then collecting users. Simpler: fetch bookings and events and collect users isn't ideal.
+                // Instead, create a minimal `/api/users` endpoint would be best; for now attempt to fetch users by scanning users with ids 1..50 (best-effort)
+                const sel = el('bookingUser');
+                sel.innerHTML = '<option value="">Select user</option>';
+                for(let i=1;i<=50;i++){
+                    try{
+                        const u = await fetch(`/api/users/${i}`);
+                        if (!u.ok) continue;
+                        const user = await u.json();
+                        sel.insertAdjacentHTML('beforeend', `<option value="${user.id}">${user.name} (${user.email})</option>`);
+                    }catch(e){ }
+                }
+            }catch(err){ console.error(err); }
+        }
+
+        // Create user
+        el('createUserForm').addEventListener('submit', async (e)=>{
+            e.preventDefault();
+            const name = el('userName').value.trim();
+            const email = el('userEmail').value.trim();
+            if(!name||!email) return showAlert('Name and email required', 'warning');
+            try{
+                const data = await fetchJSON('/api/users', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({name,email}) });
+                showAlert('User created (id: '+data.id+')', 'success');
+                el('userName').value=''; el('userEmail').value='';
+                loadUsers();
+            }catch(err){ showAlert('Failed to create user','danger'); console.error(err); }
+        });
+
+        // Create event
+        el('createEventForm').addEventListener('submit', async (e)=>{
+            e.preventDefault();
+            const name = el('eventName').value.trim();
+            const seats = parseInt(el('eventSeats').value,10);
+            if(!name||!seats) return showAlert('Name and seats required','warning');
+            try{
+                const data = await fetchJSON('/api/events', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ name, total_seats: seats }) });
+                showAlert('Event created', 'success');
+                el('eventName').value=''; el('eventSeats').value='';
+                loadEvents();
+            }catch(err){ showAlert('Failed to create event','danger'); console.error(err); }
+        });
+
+        // Booking
+        el('bookingForm').addEventListener('submit', async (e)=>{
+            e.preventDefault();
+            const user_id = parseInt(el('bookingUser').value,10);
+            const event_id = parseInt(el('bookingEvent').value,10);
+            const seats = parseInt(el('bookingSeats').value,10);
+            if(!user_id||!event_id||!seats) return showAlert('Choose user, event and seats','warning');
+            try{
+                const data = await fetchJSON('/api/bookings', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ user_id, event_id, seats }) });
+                el('bookingResult').innerHTML = `<div class="text-success">Booking created (id: ${data.booking_id})</div>`;
+                loadEvents();
+                viewBookings(event_id);
+            }catch(err){
+                el('bookingResult').innerHTML = `<div class="text-danger">${err.message}</div>`;
+                console.error(err);
+            }
+        });
+
+        async function viewBookings(eventId){
+            try{
+                const rows = await fetchJSON(`/api/events/${eventId}/bookings`);
+                if(rows.length===0){ el('bookingsList').innerHTML = '<div class="text-muted">No bookings for this event</div>'; return; }
+                el('bookingsList').innerHTML = rows.map(b=>`<div><strong>${b.user_name}</strong> (${b.user_email}) — seats: ${b.seats_reserved} <span class="text-muted small">${new Date(b.created_at).toLocaleString()}</span></div>`).join('');
+            }catch(err){ el('bookingsList').innerHTML = '<div class="text-danger">Failed to load bookings</div>'; console.error(err); }
+        }
+
+        async function deleteEvent(id){
+            if(!confirm('Delete event #'+id+'?')) return;
+            try{
+                await fetchJSON('/api/events/'+id, { method: 'DELETE' });
+                showAlert('Event deleted','success');
+                loadEvents();
+            }catch(err){ showAlert('Failed to delete event','danger'); console.error(err); }
+        }
+
+        // initial load
+        loadEvents();
+    </script>
+</body>
+</html>
