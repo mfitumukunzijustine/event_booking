@@ -1,0 +1,6 @@
+node_modules
+dist
+event_booking/
+git/
+*.min.js
+.cache
