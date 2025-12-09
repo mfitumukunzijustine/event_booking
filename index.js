@@ -233,7 +233,7 @@ app.post('/api/bookings', async (req, res) => {
 
       res.status(201).json({ booking_id: result.insertId, message: 'Booking created' });
     } catch (err) {
-      try { await conn.rollback(); } catch (e) {}
+      try { await conn.rollback(); } catch (e) { console.error('Rollback failed:', e); }
       conn.release();
       throw err;
     }
