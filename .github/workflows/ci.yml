@@ -15,7 +15,7 @@ jobs:
         image: mysql:8.0
         env:
           MYSQL_ROOT_PASSWORD: password
-          MYSQL_DATABASE: notes_app
+          MYSQL_DATABASE: event_booking
         ports:
           - 3306:3306
         options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
@@ -50,18 +50,29 @@ jobs:
     needs: test
     runs-on: ubuntu-latest
     
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: password
+          MYSQL_DATABASE: event_booking
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+
     steps:
     - uses: actions/checkout@v4
-    
+
     - name: Build Docker image
       run: docker build -t notes-app:${{ github.sha }} .
-    
+
     - name: Test Docker image
       run: |
-        docker run -d --name test-container -p 3000:3000 notes-app:${{ github.sha }}
+        # Run the container and point it to the service MySQL running on the runner host
+        docker run -d --name test-container --add-host=host.docker.internal:host-gateway -e DB_HOST=host.docker.internal -e DB_USER=root -e DB_PASSWORD=password -e DB_NAME=event_booking -p 3000:3000 notes-app:${{ github.sha }}
         sleep 10
-        curl -f http://localhost:3000/health || exit 1
-        docker stop test-container
+        curl -f http://localhost:3000/health || (docker logs test-container && exit 1)
+        docker stop test-container || true
 
   deploy:
     needs: build
